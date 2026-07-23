@@ -1,12 +1,19 @@
 import { Bell, Check, Cloud, ImagePlus, Pencil, Save, Smartphone, UsersRound, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { compressAvatar } from "../lib/avatar.js";
+import { profilePlatformContent } from "./profilePlatform.js";
 
-export function ProfilePage({ profile, onUpdateProfile, notificationState, onAskNotification, reminderSettings, onOpenReminderSettings, bills, transactions, storageError }) {
+export function ProfilePage({ profile, onUpdateProfile, notificationState, reminderPermission, isNative, onAskNotification, reminderSettings, onOpenReminderSettings, bills, transactions, storageError }) {
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState(profile.name);
   const [error, setError] = useState("");
   const fileRef = useRef(null);
+  const platformContent = profilePlatformContent({
+    isNative,
+    notificationState,
+    reminderPermission,
+  });
+  const notificationPermission = platformContent.notificationPermission;
 
   const saveName = () => {
     const value = name.trim();
@@ -56,10 +63,10 @@ export function ProfilePage({ profile, onUpdateProfile, notificationState, onAsk
       </div>
       {error && <p className="profile-error" role="alert">{error}</p>}
 
-      <div className={`notification-card ${notificationState === "granted" ? "enabled" : ""}`}>
+      <div className={`notification-card ${notificationPermission === "granted" ? "enabled" : ""}`}>
         <span className="notification-icon"><Bell size={23} /></span>
-        <div><strong>{notificationState === "granted" ? "系统通知已开启" : "开启账单提醒"}</strong><p>{notificationState === "granted" ? "账单到期前提醒你" : "不再错过续费和固定扣款"}</p></div>
-        {notificationState === "granted" ? <span className="on-badge"><Check size={14} />已开启</span> : <button onClick={onAskNotification}>开启</button>}
+        <div><strong>{notificationPermission === "granted" ? "系统通知已开启" : "开启账单提醒"}</strong><p>{notificationPermission === "granted" ? "账单到期前提醒你" : "不再错过续费和固定扣款"}</p></div>
+        {notificationPermission === "granted" ? <span className="on-badge"><Check size={14} />已开启</span> : <button onClick={onAskNotification}>开启</button>}
       </div>
 
       <div className="sync-card local">
@@ -72,11 +79,11 @@ export function ProfilePage({ profile, onUpdateProfile, notificationState, onAsk
         <h2>账期设置</h2>
         <button onClick={onOpenReminderSettings}><span className="setting-icon"><Bell size={18} /></span><div><strong>提醒偏好</strong><p>{reminderSettings.enabled ? `提前 ${reminderSettings.daysBefore} 天 · ${reminderSettings.time}` : "已关闭"}</p></div><span>›</span></button>
         <button><span className="setting-icon"><UsersRound size={18} /></span><div><strong>共享成员</strong><p>固定账单可选择共享</p></div><span>›</span></button>
-        <button><span className="setting-icon"><Smartphone size={18} /></span><div><strong>当前设备</strong><p>本机 PWA</p></div><span>›</span></button>
+        <button><span className="setting-icon"><Smartphone size={18} /></span><div><strong>当前设备</strong><p>{platformContent.deviceLabel}</p></div><span>›</span></button>
       </div>
       <div className="data-note">
         <strong>请注意本地数据</strong>
-        <p>卸载应用或清除浏览器数据可能删除账目。日常流水不会共享给朋友。</p>
+        <p>{platformContent.dataLossWarning}</p>
       </div>
       {storageError && <p className="profile-error" role="alert">{storageError}</p>}
     </section>

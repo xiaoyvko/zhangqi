@@ -185,6 +185,7 @@ button { color: inherit; }
 .delete-confirm { flex:1;display:flex;align-items:center;gap:6px; }
 .delete-confirm span { flex:1;font-size:10px;color:#a83b2a; }.delete-confirm button{height:38px!important;padding:0 10px!important;background:#e6e4dd}.delete-confirm .danger{background:#c95542;color:white}
 .storage-alert { position:fixed;z-index:80;left:50%;transform:translateX(-50%);bottom:90px;width:calc(100% - 32px);max-width:520px;background:#a83b2a;color:white;border-radius:13px;padding:10px 13px;font-size:10px;text-align:center; }
+.reminder-alert { border:0;bottom:126px;cursor:pointer; }
 .bills-page,.ledger-page,.profile-page { padding-top:28px; }
 .bill-overview-card { background:var(--ink);color:white;border-radius:22px;padding:19px;margin-bottom:14px;display:flex;align-items:center; }
 .bill-overview-card>div { flex:1; }.bill-overview-card span,.bill-overview-card strong{display:block}.bill-overview-card span{font-size:10px;color:#aaa}.bill-overview-card strong{font-size:29px;margin-top:4px}
@@ -231,6 +232,7 @@ button { color: inherit; }
 .profile-page .notification-card { margin-bottom:0; }.profile-page .setting-group button>span:last-child{color:#999}
 
 .reminder-settings-sheet fieldset{border:0;margin:0 0 14px;padding:0;min-width:0}.reminder-settings-sheet fieldset[disabled]{opacity:.5}.reminder-settings-sheet legend{font-size:10px;font-weight:600;color:#66685f;margin:0 0 7px}.reminder-day-options{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-bottom:14px}.reminder-day-options button{height:42px;border:1px solid var(--line);border-radius:12px;background:var(--card);padding:0 4px;font-size:10px;white-space:nowrap}.reminder-day-options button.active{background:var(--ink);border-color:var(--ink);color:var(--lime);font-weight:700}.reminder-day-options button:disabled{cursor:not-allowed}.reminder-time-field{display:block}.permission-status{margin:0 0 14px;background:#ebe9e3;border-radius:11px;padding:10px 11px;color:var(--muted);font-size:10px}.permission-status.granted{background:#f0f6dc;color:#607525}.reminder-settings-sheet .modal-actions{padding-bottom:max(0px,env(safe-area-inset-bottom))}
+.permission-action,.reminder-sync-error{display:flex;align-items:center;gap:9px}.permission-action span,.reminder-sync-error span{flex:1}.permission-action button,.reminder-sync-error button{border:0;border-radius:9px;padding:7px 9px;background:var(--ink);color:var(--lime);font-size:9px;font-weight:700;white-space:nowrap}
 
 @media (max-width: 380px) {
   .quick-stats { gap:6px; }.quick-stats>div{padding:12px 8px}.stats-summary{gap:5px}.stats-summary>div{padding:10px 6px}.calendar-card{padding:8px}

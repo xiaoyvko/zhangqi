@@ -15,12 +15,17 @@ $androidHome = Join-Path $toolchainRoot "sdk"
 $cmdlineToolsRoot = Join-Path $androidHome "cmdline-tools"
 $cmdlineToolsLatest = Join-Path $cmdlineToolsRoot "latest"
 $jdkArchive = Join-Path $downloadsRoot "microsoft-jdk-21-windows-x64.zip"
-$jdkChecksumFile = Join-Path $downloadsRoot "microsoft-jdk-21-windows-x64.zip.sha256sum.txt"
 $androidToolsArchive = Join-Path $downloadsRoot "commandlinetools-win-15859902_latest.zip"
-$jdkUrl = "https://aka.ms/download-jdk/microsoft-jdk-21-windows-x64.zip"
-$jdkChecksumUrl = "$jdkUrl.sha256sum.txt"
+$jdkVersion = "21.0.12"
+$jdkUrl = "https://download.visualstudio.microsoft.com/download/pr/c7d3e465-726d-4ec3-9e1f-718ae2804011/fdc5aa7c002a1217f76b45cb50b6bc1c/microsoft-jdk-21.0.12-windows-x64.zip"
+$jdkSha256 = "bf27a5d6298c736af8daf5b8c883098e83291446e5766118d8a5ea6a2617195d"
 $androidToolsUrl = "https://dl.google.com/android/repository/commandlinetools-win-15859902_latest.zip"
 $androidToolsSha256 = "90ae805d20434428bffcb699c290860f19bb5f66a67e6b330067e3de801fb04a"
+$requiredSdkPackageVersions = [ordered]@{
+    "platform-tools" = "37.0.0"
+    "platforms;android-36" = "2"
+    "build-tools;36.0.0" = "36.0.0"
+}
 
 function Invoke-CheckedNative {
     param(
@@ -137,7 +142,7 @@ function Get-OfficialArchive {
     }
 }
 
-function Test-MicrosoftJdk21Runtime {
+function Test-PinnedMicrosoftJdkRuntime {
     param(
         [Parameter(Mandatory = $true)]
         [string]$JdkDirectory
@@ -152,7 +157,7 @@ function Test-MicrosoftJdk21Runtime {
 
     $releaseMetadata = Get-Content -LiteralPath $jdkReleaseFile -Raw
     if (($releaseMetadata -notmatch '(?m)^IMPLEMENTOR="Microsoft"\s*$') -or
-        ($releaseMetadata -notmatch '(?m)^JAVA_VERSION="21\.')) {
+        ($releaseMetadata -notmatch ('(?m)^JAVA_VERSION="' + [regex]::Escape($jdkVersion) + '"\s*$'))) {
         return $false
     }
 
@@ -172,7 +177,7 @@ function Test-MicrosoftJdk21Runtime {
 
     $runtimeText = $runtimeOutput | Out-String
     return ($runtimeText -match '(?m)^\s*java\.vendor\s*=\s*Microsoft\s*$') -and
-        ($runtimeText -match '(?m)^\s*java\.version\s*=\s*21\.')
+        ($runtimeText -match ('(?m)^\s*java\.version\s*=\s*' + [regex]::Escape($jdkVersion) + '\s*$'))
 }
 
 function Test-RequiredSdkPackageMetadata {
@@ -199,12 +204,12 @@ function Test-RequiredSdkPackageMetadata {
     }
 
     $metadataText = $metadataOutput | Out-String
-    $requiredPatterns = @(
-        '(?m)^\s*platform-tools\s*\|\s*[0-9][^|\r\n]*\|',
-        '(?m)^\s*platforms;android-36\s*\|\s*[0-9][^|\r\n]*\|',
-        '(?m)^\s*build-tools;36\.0\.0\s*\|\s*36\.0\.0\s*\|'
-    )
-    foreach ($requiredPattern in $requiredPatterns) {
+    foreach ($requiredPackage in $requiredSdkPackageVersions.GetEnumerator()) {
+        $requiredPattern = '(?m)^\s*' +
+            [regex]::Escape($requiredPackage.Key) +
+            '\s*\|\s*' +
+            [regex]::Escape($requiredPackage.Value) +
+            '\s*\|'
         if ($metadataText -notmatch $requiredPattern) {
             return $false
         }
@@ -218,24 +223,13 @@ New-Item -ItemType Directory -Path $androidHome -Force | Out-Null
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-Remove-ToolchainItem -Path $jdkChecksumFile
-Get-OfficialArchive -Uri $jdkChecksumUrl -Destination $jdkChecksumFile
-$jdkChecksumText = Get-Content -LiteralPath $jdkChecksumFile -Raw
-$jdkChecksumMatch = [regex]::Match($jdkChecksumText, '(?i)\b([0-9a-f]{64})\b')
-if (-not $jdkChecksumMatch.Success) {
-    Remove-ToolchainItem -Path $jdkChecksumFile
-    throw "Microsoft OpenJDK checksum metadata is invalid."
-}
-$jdkSha256 = $jdkChecksumMatch.Groups[1].Value.ToLowerInvariant()
-
 Get-OfficialArchive -Uri $jdkUrl -Destination $jdkArchive -ExpectedSha256 $jdkSha256
 $actualJdkSha256 = (Get-FileHash -LiteralPath $jdkArchive -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($actualJdkSha256 -ne $jdkSha256) {
     Remove-ToolchainItem -Path $jdkArchive
-    Remove-ToolchainItem -Path $jdkChecksumFile
     throw "Microsoft OpenJDK archive SHA-256 verification failed."
 }
-Write-Host "Microsoft OpenJDK archive SHA-256 verified."
+Write-Host "Microsoft OpenJDK $jdkVersion archive SHA-256 verified."
 
 Get-OfficialArchive -Uri $androidToolsUrl -Destination $androidToolsArchive -ExpectedSha256 $androidToolsSha256
 $actualAndroidToolsSha256 = (Get-FileHash -LiteralPath $androidToolsArchive -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -245,7 +239,7 @@ if ($actualAndroidToolsSha256 -ne $androidToolsSha256) {
 }
 Write-Host "Android command-line tools SHA-256 verified."
 
-if (-not (Test-MicrosoftJdk21Runtime -JdkDirectory $jdkRoot)) {
+if (-not (Test-PinnedMicrosoftJdkRuntime -JdkDirectory $jdkRoot)) {
     $jdkStaging = Join-Path $toolchainRoot "jdk-extract"
     Remove-ToolchainItem -Path $jdkStaging
     Remove-ToolchainItem -Path $jdkRoot
@@ -262,13 +256,12 @@ if (-not (Test-MicrosoftJdk21Runtime -JdkDirectory $jdkRoot)) {
     Move-Item -LiteralPath $jdkSource.FullName -Destination $jdkRoot
     Remove-ToolchainItem -Path $jdkStaging
 }
-if (-not (Test-MicrosoftJdk21Runtime -JdkDirectory $jdkRoot)) {
+if (-not (Test-PinnedMicrosoftJdkRuntime -JdkDirectory $jdkRoot)) {
     Remove-ToolchainItem -Path $jdkRoot
     Remove-ToolchainItem -Path $jdkArchive
-    Remove-ToolchainItem -Path $jdkChecksumFile
-    throw "Portable runtime is not Microsoft OpenJDK 21; local JDK cache was invalidated."
+    throw "Portable runtime is not Microsoft OpenJDK $jdkVersion; local JDK cache was invalidated."
 }
-Write-Host "Microsoft OpenJDK 21 runtime metadata verified."
+Write-Host "Microsoft OpenJDK $jdkVersion runtime metadata verified."
 
 $androidToolsStaging = Join-Path $toolchainRoot "android-tools-extract"
 Remove-ToolchainItem -Path $androidToolsStaging
@@ -342,7 +335,7 @@ foreach ($requiredSdkFile in $requiredSdkFiles) {
         throw "SDK package metadata exists but required package content is missing."
     }
 }
-Write-Host "Required Android SDK package metadata and content verified."
+Write-Host "Pinned Android SDK package revisions and content verified."
 
 $escapedSdkPath = ConvertTo-JavaPropertiesEscapedValue -Value $androidHome
 $localProperties = Join-Path $repoRoot "android\local.properties"

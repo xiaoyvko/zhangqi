@@ -1,5 +1,6 @@
 import { Check } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { App as CapacitorApp } from "@capacitor/app";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { Capacitor } from "@capacitor/core";
 import { BillModal } from "./components/BillModal.jsx";
@@ -9,7 +10,13 @@ import { ReminderSettingsModal } from "./components/ReminderSettingsModal.jsx";
 import { TransactionModal } from "./components/TransactionModal.jsx";
 import { BILL_COLORS, daysUntil, seedBills } from "./domain/bills.js";
 import { useFinanceData } from "./hooks/useFinanceData.js";
-import { checkReminderPermission, requestReminderPermission, syncBillReminders } from "./native/localNotifications.js";
+import { registerNativeAppStateListener } from "./native/appLifecycle.js";
+import {
+  openExactReminderSettings,
+  queueBillReminderSync,
+  requestReminderPermission,
+} from "./native/localNotifications.js";
+import { reduceReminderSyncError } from "./native/reminderSyncState.js";
 import { BillsPage } from "./pages/BillsPage.jsx";
 import { HomePage } from "./pages/HomePage.jsx";
 import { LedgerPage } from "./pages/LedgerPage.jsx";
@@ -23,33 +30,60 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [notificationState, setNotificationState] = useState("default");
   const [reminderPermission, setReminderPermission] = useState("prompt");
+  const [exactAlarmPermission, setExactAlarmPermission] = useState("prompt");
+  const [reminderSyncError, setReminderSyncError] = useState("");
+  const isNative = Capacitor.isNativePlatform();
+  const reminderInputRef = useRef({
+    bills: finance.bills,
+    settings: finance.reminderSettings,
+  });
+  reminderInputRef.current = {
+    bills: finance.bills,
+    settings: finance.reminderSettings,
+  };
 
-  useEffect(() => {
-    let cancelled = false;
-    if (!Capacitor.isNativePlatform()) {
-      if ("Notification" in window) setNotificationState(Notification.permission);
-      if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
-    }
-
-    checkReminderPermission(LocalNotifications)
-      .then((permission) => {
-        if (!cancelled) setReminderPermission(permission);
+  const runReminderSync = useCallback((input = reminderInputRef.current) => {
+    return queueBillReminderSync({
+      ...input,
+      plugin: LocalNotifications,
+      storage: localStorage,
+    })
+      .then((status) => {
+        if (status !== "web") {
+          setReminderPermission(status.permission);
+          setExactAlarmPermission(status.exactAlarm);
+        }
+        setReminderSyncError((current) => reduceReminderSyncError(current, { type: "success" }));
+        return status;
       })
-      .catch(() => {
-        if (!cancelled) setReminderPermission("denied");
+      .catch((error) => {
+        setReminderSyncError((current) => reduceReminderSyncError(current, { type: "failure" }));
+        throw error;
       });
-
-    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
-    syncBillReminders({
+    if (!isNative) {
+      if ("Notification" in window) setNotificationState(Notification.permission);
+      if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
+    }
+  }, [isNative]);
+
+  useEffect(() => {
+    runReminderSync({
       bills: finance.bills,
       settings: finance.reminderSettings,
-      plugin: LocalNotifications,
-      storage: localStorage,
     }).catch(() => {});
-  }, [finance.bills, finance.reminderSettings]);
+  }, [finance.bills, finance.reminderSettings, runReminderSync]);
+
+  useEffect(() => {
+    if (!isNative) return undefined;
+    return registerNativeAppStateListener(
+      CapacitorApp,
+      () => runReminderSync().catch(() => {}),
+      () => setReminderSyncError((current) => reduceReminderSyncError(current, { type: "failure" })),
+    );
+  }, [isNative, runReminderSync]);
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -117,6 +151,22 @@ export default function App() {
     }
   };
 
+  const openNativeExactAlarmSettings = async () => {
+    try {
+      const permission = await openExactReminderSettings(LocalNotifications);
+      setExactAlarmPermission(permission);
+      if (permission === "granted") {
+        await runReminderSync();
+      }
+      return permission;
+    } catch {
+      setReminderSyncError((current) => reduceReminderSyncError(current, { type: "failure" }));
+      return "denied";
+    }
+  };
+
+  const retryReminderSync = () => runReminderSync().catch(() => {});
+
   const saveReminderSettings = (settings) => {
     const saved = finance.updateReminderSettings(settings);
     if (saved) setToast("提醒偏好已保存");
@@ -124,8 +174,8 @@ export default function App() {
   };
 
   const askNotification = async () => {
-    if (Capacitor.isNativePlatform()) {
-      setToast("\u8bf7\u5728\u63d0\u9192\u504f\u597d\u4e2d\u5f00\u542f\u672c\u5730\u63d0\u9192");
+    if (isNative) {
+      setModal({ kind: "reminders" });
       return;
     }
     if (!("Notification" in window)) {
@@ -171,6 +221,8 @@ export default function App() {
           profile={finance.profile}
           onUpdateProfile={finance.updateProfile}
           notificationState={notificationState}
+          reminderPermission={reminderPermission}
+          isNative={isNative}
           onAskNotification={askNotification}
           reminderSettings={finance.reminderSettings}
           onOpenReminderSettings={() => setModal({ kind: "reminders" })}
@@ -204,13 +256,27 @@ export default function App() {
         <ReminderSettingsModal
           settings={finance.reminderSettings}
           permission={reminderPermission}
+          exactAlarmPermission={exactAlarmPermission}
+          reminderSyncError={reminderSyncError}
+          isNative={isNative}
           onSave={saveReminderSettings}
           onRequestPermission={requestNativeReminderPermission}
+          onOpenExactAlarmSettings={openNativeExactAlarmSettings}
+          onRetrySync={retryReminderSync}
           onClose={() => setModal(null)}
         />
       )}
       {toast && <div className="toast"><Check size={17} />{toast}</div>}
       {finance.storageError && active !== "profile" && <div className="storage-alert">{finance.storageError}</div>}
+      {reminderSyncError && modal?.kind !== "reminders" && (
+        <button
+          type="button"
+          className="storage-alert reminder-alert"
+          onClick={() => setModal({ kind: "reminders" })}
+        >
+          {reminderSyncError} · 打开提醒偏好
+        </button>
+      )}
     </main>
   );
 }

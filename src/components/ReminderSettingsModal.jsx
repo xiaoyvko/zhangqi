@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { REMINDER_DAY_OPTIONS, normalizeReminderSettings } from "../domain/reminders.js";
 
 function permissionText(permission) {
@@ -11,8 +11,13 @@ function permissionText(permission) {
 export function ReminderSettingsModal({
   settings,
   permission,
+  exactAlarmPermission,
+  reminderSyncError,
+  isNative,
   onSave,
   onRequestPermission,
+  onOpenExactAlarmSettings,
+  onRetrySync,
   onClose,
 }) {
   const [form, setForm] = useState(() => normalizeReminderSettings(settings));
@@ -33,6 +38,10 @@ export function ReminderSettingsModal({
 
     if (form.enabled && nextPermission !== "granted" && nextPermission !== "web") {
       setPermissionWarning("系统通知未开启，账目仍会正常保存");
+      return;
+    }
+    if (form.enabled && isNative && exactAlarmPermission !== "granted") {
+      setPermissionWarning("精确提醒未开启，账目仍会正常保存");
       return;
     }
     onClose();
@@ -78,7 +87,22 @@ export function ReminderSettingsModal({
         <p className={`permission-status ${permission === "granted" ? "granted" : ""}`} role="status">
           {permissionText(permission)}
         </p>
+        {isNative && exactAlarmPermission !== "granted" && (
+          <div className="permission-status permission-action" role="status">
+            <span>需要开启“闹钟和提醒”权限，才能按所选分钟提醒</span>
+            <button type="button" onClick={onOpenExactAlarmSettings}>前往系统设置</button>
+          </div>
+        )}
+        {isNative && exactAlarmPermission === "granted" && (
+          <p className="permission-status granted" role="status">精确提醒已开启</p>
+        )}
         {permissionWarning && <p className="profile-error" role="alert">{permissionWarning}</p>}
+        {reminderSyncError && (
+          <div className="profile-error reminder-sync-error" role="alert">
+            <span>{reminderSyncError}</span>
+            <button type="button" onClick={onRetrySync}>重试同步</button>
+          </div>
+        )}
 
         <div className="modal-actions">
           <button type="button" className="cancel" onClick={onClose}>取消</button>

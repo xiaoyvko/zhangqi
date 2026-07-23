@@ -17,6 +17,10 @@ function permissionStatus(result) {
   return result?.display ?? "denied";
 }
 
+function exactAlarmStatus(result) {
+  return result?.exact_alarm ?? "denied";
+}
+
 function readManagedIds(storage) {
   try {
     const parsed = JSON.parse(storage.getItem(MANAGED_IDS_KEY) ?? "[]");
@@ -44,6 +48,22 @@ export async function requestReminderPermission(
   return permissionStatus(await plugin.requestPermissions());
 }
 
+export async function checkExactReminderSetting(
+  plugin,
+  isNativePlatform = defaultIsNativePlatform,
+) {
+  if (!isNativePlatform()) return "web";
+  return exactAlarmStatus(await plugin.checkExactNotificationSetting());
+}
+
+export async function openExactReminderSettings(
+  plugin,
+  isNativePlatform = defaultIsNativePlatform,
+) {
+  if (!isNativePlatform()) return "web";
+  return exactAlarmStatus(await plugin.changeExactNotificationSetting());
+}
+
 export async function syncBillReminders({
   bills,
   settings,
@@ -60,17 +80,44 @@ export async function syncBillReminders({
       notifications: managedIds.map((id) => ({ id })),
     });
   }
+  storage.setItem(MANAGED_IDS_KEY, "[]");
 
   await plugin.createChannel(CHANNEL);
 
   const permission = await checkReminderPermission(plugin, isNativePlatform);
-  if (permission !== "granted") return permission;
+  const exactAlarm = await checkExactReminderSetting(plugin, isNativePlatform);
+  const status = { permission, exactAlarm };
+  if (permission !== "granted" || exactAlarm !== "granted") return status;
 
   const notifications = buildReminderNotifications(bills, settings, now);
   if (notifications.length > 0) {
-    await plugin.schedule({ notifications });
+    try {
+      await plugin.schedule({ notifications });
+      storage.setItem(
+        MANAGED_IDS_KEY,
+        JSON.stringify(notifications.map(({ id }) => id)),
+      );
+    } catch (error) {
+      await plugin.cancel({
+        notifications: notifications.map(({ id }) => ({ id })),
+      });
+      throw error;
+    }
   }
-  storage.setItem(MANAGED_IDS_KEY, JSON.stringify(notifications.map(({ id }) => id)));
 
-  return permission;
+  return status;
 }
+
+export function createBillReminderSyncQueue(sync = syncBillReminders) {
+  let tail = Promise.resolve();
+
+  return function queueReminderSync(options) {
+    const next = tail
+      .catch(() => undefined)
+      .then(() => sync(options));
+    tail = next;
+    return next;
+  };
+}
+
+export const queueBillReminderSync = createBillReminderSyncQueue();
