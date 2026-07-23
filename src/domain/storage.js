@@ -1,3 +1,8 @@
+import {
+  DEFAULT_REMINDER_SETTINGS,
+  normalizeReminderSettings,
+} from "./reminders.js";
+
 export const STORAGE_KEY = "zhangqi-finance-v2";
 export const DEFAULT_PROFILE = {
   name: "漫",
@@ -10,6 +15,7 @@ function defaultFinanceData() {
     profile: { ...DEFAULT_PROFILE },
     transactions: [],
     bills: null,
+    reminderSettings: { ...DEFAULT_REMINDER_SETTINGS },
   };
 }
 
@@ -28,7 +34,13 @@ export function loadFinanceData(storage = localStorage) {
     return {
       profile: { ...DEFAULT_PROFILE, ...profile },
       transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
-      bills: Array.isArray(parsed.bills) ? parsed.bills : null,
+      bills: Array.isArray(parsed.bills)
+        ? parsed.bills.map((bill) => ({
+          ...bill,
+          reminderEnabled: bill.reminderEnabled !== false,
+        }))
+        : null,
+      reminderSettings: normalizeReminderSettings(parsed.reminderSettings),
     };
   } catch {
     return defaultFinanceData();

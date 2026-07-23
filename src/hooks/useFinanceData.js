@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { normalizeTransaction } from "../domain/ledger.js";
 import { loadFinanceData, saveFinanceData, upsertBill } from "../domain/storage.js";
+import { normalizeReminderSettings } from "../domain/reminders.js";
 
 const LEGACY_BILLS_KEY = "zhangqi-bills";
 const STORAGE_ERROR_MESSAGE = "手机存储空间不足，刚才的修改尚未保存";
@@ -24,6 +25,7 @@ export function useFinanceData(seedBills = []) {
       profile: loaded.profile,
       transactions: loaded.transactions,
       bills: loaded.bills ?? loadLegacyBills() ?? seedBills,
+      reminderSettings: loaded.reminderSettings,
     };
   });
   const dataRef = useRef(data);
@@ -54,6 +56,13 @@ export function useFinanceData(seedBills = []) {
         ...patch,
         updatedAt: new Date().toISOString(),
       },
+    })),
+    updateReminderSettings: (patch) => commit((current) => ({
+      ...current,
+      reminderSettings: normalizeReminderSettings({
+        ...current.reminderSettings,
+        ...patch,
+      }),
     })),
     addTransaction: (input) => commit((current) => ({
       ...current,
