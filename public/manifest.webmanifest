@@ -1,0 +1,18 @@
+{
+  "name": "账期｜订阅与固定账单提醒",
+  "short_name": "账期",
+  "description": "和朋友一起，清楚管理每一笔固定支出",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f3ee",
+  "theme_color": "#f5f3ee",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
