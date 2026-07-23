@@ -7,3 +7,9 @@ mobile-home.png
 .env*
 *.log
 .superpowers/
+.android-toolchain/
+.gradle-home/
+.signing/
+release/*.apk
+android/local.properties
+android/keystore.properties

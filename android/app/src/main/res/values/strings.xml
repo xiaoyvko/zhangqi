@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">&#x8D26;&#x671F;</string>
+    <string name="title_activity_main">&#x8D26;&#x671F;</string>
+    <string name="package_name">com.zhangqi.billreminder</string>
+    <string name="custom_url_scheme">com.zhangqi.billreminder</string>
+</resources>

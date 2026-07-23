@@ -1,6 +1,7 @@
 import { Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import { LocalNotifications } from "@capacitor/local-notifications";
+import { Capacitor } from "@capacitor/core";
 import { BillModal } from "./components/BillModal.jsx";
 import { BottomNav } from "./components/BottomNav.jsx";
 import { QuickActionSheet } from "./components/QuickActionSheet.jsx";
@@ -25,8 +26,10 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
-    if ("Notification" in window) setNotificationState(Notification.permission);
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
+    if (!Capacitor.isNativePlatform()) {
+      if ("Notification" in window) setNotificationState(Notification.permission);
+      if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
+    }
 
     checkReminderPermission(LocalNotifications)
       .then((permission) => {
@@ -121,6 +124,10 @@ export default function App() {
   };
 
   const askNotification = async () => {
+    if (Capacitor.isNativePlatform()) {
+      setToast("\u8bf7\u5728\u63d0\u9192\u504f\u597d\u4e2d\u5f00\u542f\u672c\u5730\u63d0\u9192");
+      return;
+    }
     if (!("Notification" in window)) {
       setToast("当前浏览器不支持系统通知");
       return;

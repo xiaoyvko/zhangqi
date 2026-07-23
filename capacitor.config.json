@@ -1,0 +1,9 @@
+{
+  "appId": "com.zhangqi.billreminder",
+  "appName": "\u8d26\u671f",
+  "webDir": "dist/client",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": false
+  }
+}

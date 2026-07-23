@@ -9,7 +9,10 @@
     "postbuild": "node scripts/copy-hosting.mjs",
     "start": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "android:add": "cap add android",
+    "android:sync": "pnpm run build && cap sync android",
+    "android:assets": "capacitor-assets generate --android"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.2",
