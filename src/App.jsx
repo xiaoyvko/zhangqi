@@ -1,11 +1,14 @@
 import { Check } from "lucide-react";
 import { useEffect, useState } from "react";
+import { LocalNotifications } from "@capacitor/local-notifications";
 import { BillModal } from "./components/BillModal.jsx";
 import { BottomNav } from "./components/BottomNav.jsx";
 import { QuickActionSheet } from "./components/QuickActionSheet.jsx";
+import { ReminderSettingsModal } from "./components/ReminderSettingsModal.jsx";
 import { TransactionModal } from "./components/TransactionModal.jsx";
 import { BILL_COLORS, daysUntil, seedBills } from "./domain/bills.js";
 import { useFinanceData } from "./hooks/useFinanceData.js";
+import { checkReminderPermission, requestReminderPermission, syncBillReminders } from "./native/localNotifications.js";
 import { BillsPage } from "./pages/BillsPage.jsx";
 import { HomePage } from "./pages/HomePage.jsx";
 import { LedgerPage } from "./pages/LedgerPage.jsx";
@@ -18,11 +21,32 @@ export default function App() {
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState("");
   const [notificationState, setNotificationState] = useState("default");
+  const [reminderPermission, setReminderPermission] = useState("prompt");
 
   useEffect(() => {
+    let cancelled = false;
     if ("Notification" in window) setNotificationState(Notification.permission);
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
+
+    checkReminderPermission(LocalNotifications)
+      .then((permission) => {
+        if (!cancelled) setReminderPermission(permission);
+      })
+      .catch(() => {
+        if (!cancelled) setReminderPermission("denied");
+      });
+
+    return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    syncBillReminders({
+      bills: finance.bills,
+      settings: finance.reminderSettings,
+      plugin: LocalNotifications,
+      storage: localStorage,
+    }).catch(() => {});
+  }, [finance.bills, finance.reminderSettings]);
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -79,6 +103,23 @@ export default function App() {
     }
   };
 
+  const requestNativeReminderPermission = async () => {
+    try {
+      const permission = await requestReminderPermission(LocalNotifications);
+      setReminderPermission(permission);
+      return permission;
+    } catch {
+      setReminderPermission("denied");
+      return "denied";
+    }
+  };
+
+  const saveReminderSettings = (settings) => {
+    const saved = finance.updateReminderSettings(settings);
+    if (saved) setToast("提醒偏好已保存");
+    return saved;
+  };
+
   const askNotification = async () => {
     if (!("Notification" in window)) {
       setToast("当前浏览器不支持系统通知");
@@ -124,6 +165,8 @@ export default function App() {
           onUpdateProfile={finance.updateProfile}
           notificationState={notificationState}
           onAskNotification={askNotification}
+          reminderSettings={finance.reminderSettings}
+          onOpenReminderSettings={() => setModal({ kind: "reminders" })}
           bills={finance.bills}
           transactions={finance.transactions}
           storageError={finance.storageError}
@@ -147,6 +190,15 @@ export default function App() {
           bill={modal.bill}
           onSave={saveBill}
           onDelete={deleteBill}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal?.kind === "reminders" && (
+        <ReminderSettingsModal
+          settings={finance.reminderSettings}
+          permission={reminderPermission}
+          onSave={saveReminderSettings}
+          onRequestPermission={requestNativeReminderPermission}
           onClose={() => setModal(null)}
         />
       )}

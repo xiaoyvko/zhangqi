@@ -2,7 +2,7 @@ import { Bell, Check, Cloud, ImagePlus, Pencil, Save, Smartphone, UsersRound, X 
 import { useRef, useState } from "react";
 import { compressAvatar } from "../lib/avatar.js";
 
-export function ProfilePage({ profile, onUpdateProfile, notificationState, onAskNotification, bills, transactions, storageError }) {
+export function ProfilePage({ profile, onUpdateProfile, notificationState, onAskNotification, reminderSettings, onOpenReminderSettings, bills, transactions, storageError }) {
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState(profile.name);
   const [error, setError] = useState("");
@@ -70,7 +70,7 @@ export function ProfilePage({ profile, onUpdateProfile, notificationState, onAsk
 
       <div className="setting-group">
         <h2>账期设置</h2>
-        <button><span className="setting-icon"><Bell size={18} /></span><div><strong>提醒偏好</strong><p>提前 3 天提醒</p></div><span>›</span></button>
+        <button onClick={onOpenReminderSettings}><span className="setting-icon"><Bell size={18} /></span><div><strong>提醒偏好</strong><p>{reminderSettings.enabled ? `提前 ${reminderSettings.daysBefore} 天 · ${reminderSettings.time}` : "已关闭"}</p></div><span>›</span></button>
         <button><span className="setting-icon"><UsersRound size={18} /></span><div><strong>共享成员</strong><p>固定账单可选择共享</p></div><span>›</span></button>
         <button><span className="setting-icon"><Smartphone size={18} /></span><div><strong>当前设备</strong><p>本机 PWA</p></div><span>›</span></button>
       </div>

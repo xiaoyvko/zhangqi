@@ -230,6 +230,8 @@ button { color: inherit; }
 .sync-card.local { margin:12px 0 28px; }
 .profile-page .notification-card { margin-bottom:0; }.profile-page .setting-group button>span:last-child{color:#999}
 
+.reminder-settings-sheet fieldset{border:0;margin:0 0 14px;padding:0;min-width:0}.reminder-settings-sheet fieldset[disabled]{opacity:.5}.reminder-settings-sheet legend{font-size:10px;font-weight:600;color:#66685f;margin:0 0 7px}.reminder-day-options{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-bottom:14px}.reminder-day-options button{height:42px;border:1px solid var(--line);border-radius:12px;background:var(--card);padding:0 4px;font-size:10px;white-space:nowrap}.reminder-day-options button.active{background:var(--ink);border-color:var(--ink);color:var(--lime);font-weight:700}.reminder-day-options button:disabled{cursor:not-allowed}.reminder-time-field{display:block}.permission-status{margin:0 0 14px;background:#ebe9e3;border-radius:11px;padding:10px 11px;color:var(--muted);font-size:10px}.permission-status.granted{background:#f0f6dc;color:#607525}.reminder-settings-sheet .modal-actions{padding-bottom:max(0px,env(safe-area-inset-bottom))}
+
 @media (max-width: 380px) {
   .quick-stats { gap:6px; }.quick-stats>div{padding:12px 8px}.stats-summary{gap:5px}.stats-summary>div{padding:10px 6px}.calendar-card{padding:8px}
 }

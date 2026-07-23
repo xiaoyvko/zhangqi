@@ -20,6 +20,7 @@ export function BillModal({ bill, onClose, onSave, onDelete }) {
     nextDate: localDateAfter(7),
     category: "影音娱乐",
     shared: false,
+    reminderEnabled: true,
     payer: "我",
     friend: "",
     note: "",
@@ -50,6 +51,10 @@ export function BillModal({ bill, onClose, onSave, onDelete }) {
         <label className="share-toggle">
           <div><strong>与朋友共享</strong><span>共同查看账单与付款状态</span></div>
           <input type="checkbox" checked={form.shared} onChange={(event) => update("shared", event.target.checked)} /><i />
+        </label>
+        <label className="share-toggle">
+          <div><strong>到期提醒</strong><span>按照“我的”页面中的提醒偏好通知</span></div>
+          <input type="checkbox" checked={form.reminderEnabled !== false} onChange={(event) => update("reminderEnabled", event.target.checked)} /><i />
         </label>
         {form.shared && (
           <div className="form-pair">
