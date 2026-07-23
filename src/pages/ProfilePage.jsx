@@ -1,9 +1,9 @@
 import { Bell, Check, Cloud, ImagePlus, Pencil, Save, Smartphone, UsersRound, X } from "lucide-react";
-import { useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { compressAvatar } from "../lib/avatar.js";
 import { profilePlatformContent } from "./profilePlatform.js";
 
-export function ProfilePage({ profile, onUpdateProfile, notificationState, reminderPermission, isNative, onAskNotification, reminderSettings, onOpenReminderSettings, bills, transactions, storageError }) {
+export function ProfilePage({ profile, onUpdateProfile, notificationState, reminderPermission, exactAlarmPermission, isNative, onAskNotification, reminderSettings, onOpenReminderSettings, bills, transactions, storageError }) {
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState(profile.name);
   const [error, setError] = useState("");
@@ -12,8 +12,10 @@ export function ProfilePage({ profile, onUpdateProfile, notificationState, remin
     isNative,
     notificationState,
     reminderPermission,
+    exactAlarmPermission,
+    reminderEnabled: reminderSettings.enabled,
   });
-  const notificationPermission = platformContent.notificationPermission;
+  const reminderCard = platformContent.reminderCard;
 
   const saveName = () => {
     const value = name.trim();
@@ -63,10 +65,10 @@ export function ProfilePage({ profile, onUpdateProfile, notificationState, remin
       </div>
       {error && <p className="profile-error" role="alert">{error}</p>}
 
-      <div className={`notification-card ${notificationPermission === "granted" ? "enabled" : ""}`}>
+      <div className={`notification-card ${reminderCard.isReady ? "enabled" : ""}`}>
         <span className="notification-icon"><Bell size={23} /></span>
-        <div><strong>{notificationPermission === "granted" ? "系统通知已开启" : "开启账单提醒"}</strong><p>{notificationPermission === "granted" ? "账单到期前提醒你" : "不再错过续费和固定扣款"}</p></div>
-        {notificationPermission === "granted" ? <span className="on-badge"><Check size={14} />已开启</span> : <button onClick={onAskNotification}>开启</button>}
+        <div><strong>{reminderCard.title}</strong><p>{reminderCard.description}</p></div>
+        {reminderCard.isReady ? <span className="on-badge"><Check size={14} />已开启</span> : <button onClick={onAskNotification}>{reminderCard.actionLabel}</button>}
       </div>
 
       <div className="sync-card local">

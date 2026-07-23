@@ -39,4 +39,13 @@ describe("reproducible Android build configuration", () => {
     expect(read("android/gradle/wrapper/gradle-wrapper.properties"))
       .toContain("distributionSha256Sum=ed1a8d686605fd7c23bdf62c7fc7add1c5b23b2bbc3721e661934ef4a4911d7c");
   });
+
+  it("documents both Native reminder permissions and the no-schedule fallback", () => {
+    const readme = read("README.md");
+
+    expect(readme).toContain("通知权限");
+    expect(readme).toContain("“闹钟和提醒”权限");
+    expect(readme).toContain("账目仍会保存");
+    expect(readme).toContain("不会安排提醒");
+  });
 });

@@ -16,6 +16,7 @@ import {
   queueBillReminderSync,
   requestReminderPermission,
 } from "./native/localNotifications.js";
+import { guardReminderSync } from "./native/reminderSyncGuard.js";
 import { reduceReminderSyncError } from "./native/reminderSyncState.js";
 import { BillsPage } from "./pages/BillsPage.jsx";
 import { HomePage } from "./pages/HomePage.jsx";
@@ -33,6 +34,7 @@ export default function App() {
   const [exactAlarmPermission, setExactAlarmPermission] = useState("prompt");
   const [reminderSyncError, setReminderSyncError] = useState("");
   const isNative = Capacitor.isNativePlatform();
+  const mountedRef = useRef(true);
   const reminderInputRef = useRef({
     bills: finance.bills,
     settings: finance.reminderSettings,
@@ -43,23 +45,31 @@ export default function App() {
   };
 
   const runReminderSync = useCallback((input = reminderInputRef.current) => {
-    return queueBillReminderSync({
+    const task = queueBillReminderSync({
       ...input,
       plugin: LocalNotifications,
       storage: localStorage,
-    })
-      .then((status) => {
+    });
+    return guardReminderSync(task, {
+      isMounted: () => mountedRef.current,
+      onSuccess: (status) => {
         if (status !== "web") {
           setReminderPermission(status.permission);
           setExactAlarmPermission(status.exactAlarm);
         }
         setReminderSyncError((current) => reduceReminderSyncError(current, { type: "success" }));
-        return status;
-      })
-      .catch((error) => {
+      },
+      onFailure: () => {
         setReminderSyncError((current) => reduceReminderSyncError(current, { type: "failure" }));
-        throw error;
-      });
+      },
+    });
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -81,7 +91,11 @@ export default function App() {
     return registerNativeAppStateListener(
       CapacitorApp,
       () => runReminderSync().catch(() => {}),
-      () => setReminderSyncError((current) => reduceReminderSyncError(current, { type: "failure" })),
+      () => {
+        if (mountedRef.current) {
+          setReminderSyncError((current) => reduceReminderSyncError(current, { type: "failure" }));
+        }
+      },
     );
   }, [isNative, runReminderSync]);
 
@@ -222,6 +236,7 @@ export default function App() {
           onUpdateProfile={finance.updateProfile}
           notificationState={notificationState}
           reminderPermission={reminderPermission}
+          exactAlarmPermission={exactAlarmPermission}
           isNative={isNative}
           onAskNotification={askNotification}
           reminderSettings={finance.reminderSettings}
