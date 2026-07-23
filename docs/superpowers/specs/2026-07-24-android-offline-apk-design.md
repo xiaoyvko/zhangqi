@@ -116,7 +116,7 @@
 
 电脑当前没有 Java 和 Android SDK。实现阶段使用免费的官方安卓构建组件：
 
-- JDK 17
+- JDK 21（Capacitor 8 安卓工程要求）
 - Android SDK command-line tools
 - 对应的 platform-tools、build-tools 和 Android platform
 - Gradle Wrapper
@@ -160,4 +160,3 @@
 - 自动在线更新
 - 网页版与 APK 数据迁移
 - 数据导入导出与备份
-

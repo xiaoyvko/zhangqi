@@ -6,7 +6,7 @@
 
 **Architecture:** 保留现有 Vite/React 界面与本地数据模型，使用 Capacitor 8 把 `dist/client` 嵌入安卓原生容器。提醒计算保持为可单元测试的纯函数，原生通知调用集中在独立适配器中；网页环境保持无副作用，安卓环境通过 Local Notifications 插件调度。
 
-**Tech Stack:** React 19、Vite 8、Vitest 3、Capacitor 8、Capacitor Local Notifications、Android Gradle、JDK 17、Android SDK command-line tools。
+**Tech Stack:** React 19、Vite 8、Vitest 3、Capacitor 8、Capacitor Local Notifications、Android Gradle、JDK 21、Android SDK command-line tools。
 
 ## Global Constraints
 
@@ -596,7 +596,7 @@ Do not add ignored signing, SDK or APK files.
 - Create locally and ignore: `android/keystore.properties`
 
 **Interfaces:**
-- Produces: `$env:JAVA_HOME` pointing to portable Microsoft OpenJDK 17
+- Produces: `$env:JAVA_HOME` pointing to portable Microsoft OpenJDK 21
 - Produces: `$env:ANDROID_HOME` pointing to `.android-toolchain/sdk`
 - Produces: signed `android/app/build/outputs/apk/release/app-release.apk`
 
@@ -604,7 +604,7 @@ Do not add ignored signing, SDK or APK files.
 
 The script must:
 
-1. Download `https://aka.ms/download-jdk/microsoft-jdk-17-windows-x64.zip`.
+1. Download `https://aka.ms/download-jdk/microsoft-jdk-21-windows-x64.zip`.
 2. Download `https://dl.google.com/android/repository/commandlinetools-win-15859902_latest.zip`.
 3. Verify the Android tools SHA-256 equals `90ae805d20434428bffcb699c290860f19bb5f66a67e6b330067e3de801fb04a`.
 4. Extract JDK under `.android-toolchain/jdk`.
