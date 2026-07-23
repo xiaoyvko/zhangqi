@@ -5,6 +5,9 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
+$commonScript = Join-Path $PSScriptRoot "android-build-common.ps1"
+. $commonScript
+
 $toolchainRoot = Join-Path $repoRoot ".android-toolchain"
 $downloadsRoot = Join-Path $toolchainRoot "downloads"
 $jdkRoot = Join-Path $toolchainRoot "jdk"
@@ -12,8 +15,10 @@ $androidHome = Join-Path $toolchainRoot "sdk"
 $cmdlineToolsRoot = Join-Path $androidHome "cmdline-tools"
 $cmdlineToolsLatest = Join-Path $cmdlineToolsRoot "latest"
 $jdkArchive = Join-Path $downloadsRoot "microsoft-jdk-21-windows-x64.zip"
+$jdkChecksumFile = Join-Path $downloadsRoot "microsoft-jdk-21-windows-x64.zip.sha256sum.txt"
 $androidToolsArchive = Join-Path $downloadsRoot "commandlinetools-win-15859902_latest.zip"
 $jdkUrl = "https://aka.ms/download-jdk/microsoft-jdk-21-windows-x64.zip"
+$jdkChecksumUrl = "$jdkUrl.sha256sum.txt"
 $androidToolsUrl = "https://dl.google.com/android/repository/commandlinetools-win-15859902_latest.zip"
 $androidToolsSha256 = "90ae805d20434428bffcb699c290860f19bb5f66a67e6b330067e3de801fb04a"
 
@@ -132,14 +137,107 @@ function Get-OfficialArchive {
     }
 }
 
+function Test-MicrosoftJdk21Runtime {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$JdkDirectory
+    )
+
+    $javaExecutable = Join-Path $JdkDirectory "bin\java.exe"
+    $jdkReleaseFile = Join-Path $JdkDirectory "release"
+    if ((-not (Test-Path -LiteralPath $javaExecutable -PathType Leaf)) -or
+        (-not (Test-Path -LiteralPath $jdkReleaseFile -PathType Leaf))) {
+        return $false
+    }
+
+    $releaseMetadata = Get-Content -LiteralPath $jdkReleaseFile -Raw
+    if (($releaseMetadata -notmatch '(?m)^IMPLEMENTOR="Microsoft"\s*$') -or
+        ($releaseMetadata -notmatch '(?m)^JAVA_VERSION="21\.')) {
+        return $false
+    }
+
+    $savedErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $runtimeOutput = @(& $javaExecutable -XshowSettings:properties -version 2>&1)
+        $runtimeExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $savedErrorActionPreference
+    }
+
+    if ($runtimeExitCode -ne 0) {
+        return $false
+    }
+
+    $runtimeText = $runtimeOutput | Out-String
+    return ($runtimeText -match '(?m)^\s*java\.vendor\s*=\s*Microsoft\s*$') -and
+        ($runtimeText -match '(?m)^\s*java\.version\s*=\s*21\.')
+}
+
+function Test-RequiredSdkPackageMetadata {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SdkManager,
+
+        [Parameter(Mandatory = $true)]
+        [string]$SdkRoot
+    )
+
+    $savedErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "SilentlyContinue"
+        $metadataOutput = @(& $SdkManager "--sdk_root=$SdkRoot" --list_installed 2>&1)
+        $metadataExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $savedErrorActionPreference
+    }
+
+    if ($metadataExitCode -ne 0) {
+        return $false
+    }
+
+    $metadataText = $metadataOutput | Out-String
+    $requiredPatterns = @(
+        '(?m)^\s*platform-tools\s*\|\s*[0-9][^|\r\n]*\|',
+        '(?m)^\s*platforms;android-36\s*\|\s*[0-9][^|\r\n]*\|',
+        '(?m)^\s*build-tools;36\.0\.0\s*\|\s*36\.0\.0\s*\|'
+    )
+    foreach ($requiredPattern in $requiredPatterns) {
+        if ($metadataText -notmatch $requiredPattern) {
+            return $false
+        }
+    }
+
+    return $true
+}
+
 New-Item -ItemType Directory -Path $downloadsRoot -Force | Out-Null
 New-Item -ItemType Directory -Path $androidHome -Force | Out-Null
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-Get-OfficialArchive -Uri $jdkUrl -Destination $jdkArchive
-Get-OfficialArchive -Uri $androidToolsUrl -Destination $androidToolsArchive -ExpectedSha256 $androidToolsSha256
+Remove-ToolchainItem -Path $jdkChecksumFile
+Get-OfficialArchive -Uri $jdkChecksumUrl -Destination $jdkChecksumFile
+$jdkChecksumText = Get-Content -LiteralPath $jdkChecksumFile -Raw
+$jdkChecksumMatch = [regex]::Match($jdkChecksumText, '(?i)\b([0-9a-f]{64})\b')
+if (-not $jdkChecksumMatch.Success) {
+    Remove-ToolchainItem -Path $jdkChecksumFile
+    throw "Microsoft OpenJDK checksum metadata is invalid."
+}
+$jdkSha256 = $jdkChecksumMatch.Groups[1].Value.ToLowerInvariant()
 
+Get-OfficialArchive -Uri $jdkUrl -Destination $jdkArchive -ExpectedSha256 $jdkSha256
+$actualJdkSha256 = (Get-FileHash -LiteralPath $jdkArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actualJdkSha256 -ne $jdkSha256) {
+    Remove-ToolchainItem -Path $jdkArchive
+    Remove-ToolchainItem -Path $jdkChecksumFile
+    throw "Microsoft OpenJDK archive SHA-256 verification failed."
+}
+Write-Host "Microsoft OpenJDK archive SHA-256 verified."
+
+Get-OfficialArchive -Uri $androidToolsUrl -Destination $androidToolsArchive -ExpectedSha256 $androidToolsSha256
 $actualAndroidToolsSha256 = (Get-FileHash -LiteralPath $androidToolsArchive -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($actualAndroidToolsSha256 -ne $androidToolsSha256) {
     Remove-ToolchainItem -Path $androidToolsArchive
@@ -147,12 +245,7 @@ if ($actualAndroidToolsSha256 -ne $androidToolsSha256) {
 }
 Write-Host "Android command-line tools SHA-256 verified."
 
-$javaExecutable = Join-Path $jdkRoot "bin\java.exe"
-$jdkReleaseFile = Join-Path $jdkRoot "release"
-$hasMicrosoftJdk21 = (Test-Path -LiteralPath $javaExecutable -PathType Leaf) -and
-    (Test-Path -LiteralPath $jdkReleaseFile -PathType Leaf) -and
-    (Select-String -LiteralPath $jdkReleaseFile -Pattern '^JAVA_VERSION="21\.' -Quiet)
-if (-not $hasMicrosoftJdk21) {
+if (-not (Test-MicrosoftJdk21Runtime -JdkDirectory $jdkRoot)) {
     $jdkStaging = Join-Path $toolchainRoot "jdk-extract"
     Remove-ToolchainItem -Path $jdkStaging
     Remove-ToolchainItem -Path $jdkRoot
@@ -162,32 +255,38 @@ if (-not $hasMicrosoftJdk21) {
         Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "bin\java.exe") } |
         Select-Object -First 1
     if ($null -eq $jdkSource) {
+        Remove-ToolchainItem -Path $jdkStaging
         throw "The Microsoft OpenJDK archive did not contain the expected JDK directory."
     }
 
     Move-Item -LiteralPath $jdkSource.FullName -Destination $jdkRoot
     Remove-ToolchainItem -Path $jdkStaging
 }
-if (-not (Select-String -LiteralPath (Join-Path $jdkRoot "release") -Pattern '^JAVA_VERSION="21\.' -Quiet)) {
-    throw "The portable Microsoft OpenJDK is not version 21."
+if (-not (Test-MicrosoftJdk21Runtime -JdkDirectory $jdkRoot)) {
+    Remove-ToolchainItem -Path $jdkRoot
+    Remove-ToolchainItem -Path $jdkArchive
+    Remove-ToolchainItem -Path $jdkChecksumFile
+    throw "Portable runtime is not Microsoft OpenJDK 21; local JDK cache was invalidated."
+}
+Write-Host "Microsoft OpenJDK 21 runtime metadata verified."
+
+$androidToolsStaging = Join-Path $toolchainRoot "android-tools-extract"
+Remove-ToolchainItem -Path $androidToolsStaging
+Remove-ToolchainItem -Path $cmdlineToolsLatest
+Expand-Archive -LiteralPath $androidToolsArchive -DestinationPath $androidToolsStaging -Force
+
+$androidToolsSource = Join-Path $androidToolsStaging "cmdline-tools"
+$stagedSdkManager = Join-Path $androidToolsSource "bin\sdkmanager.bat"
+if (-not (Test-Path -LiteralPath $stagedSdkManager -PathType Leaf)) {
+    Remove-ToolchainItem -Path $androidToolsStaging
+    throw "The verified Android command-line tools archive did not contain sdkmanager.bat."
 }
 
+New-Item -ItemType Directory -Path $cmdlineToolsRoot -Force | Out-Null
+Move-Item -LiteralPath $androidToolsSource -Destination $cmdlineToolsLatest
+Remove-ToolchainItem -Path $androidToolsStaging
 $sdkManager = Join-Path $cmdlineToolsLatest "bin\sdkmanager.bat"
-if (-not (Test-Path -LiteralPath $sdkManager)) {
-    $androidToolsStaging = Join-Path $toolchainRoot "android-tools-extract"
-    Remove-ToolchainItem -Path $androidToolsStaging
-    Remove-ToolchainItem -Path $cmdlineToolsLatest
-    Expand-Archive -LiteralPath $androidToolsArchive -DestinationPath $androidToolsStaging -Force
-
-    $androidToolsSource = Join-Path $androidToolsStaging "cmdline-tools"
-    if (-not (Test-Path -LiteralPath (Join-Path $androidToolsSource "bin\sdkmanager.bat"))) {
-        throw "The Android command-line tools archive did not contain sdkmanager.bat."
-    }
-
-    New-Item -ItemType Directory -Path $cmdlineToolsRoot -Force | Out-Null
-    Move-Item -LiteralPath $androidToolsSource -Destination $cmdlineToolsLatest
-    Remove-ToolchainItem -Path $androidToolsStaging
-}
+Write-Host "Android command-line tools rebuilt from the verified archive."
 
 $env:JAVA_HOME = $jdkRoot
 $env:ANDROID_HOME = $androidHome
@@ -211,13 +310,7 @@ $sdkPackages = @(
     "platforms;android-36",
     "build-tools;36.0.0"
 )
-$requiredSdkFiles = @(
-    (Join-Path $androidHome "platform-tools\adb.exe"),
-    (Join-Path $androidHome "platforms\android-36\android.jar"),
-    (Join-Path $androidHome "build-tools\36.0.0\apksigner.bat")
-)
-$missingSdkFiles = @($requiredSdkFiles | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) })
-if ($missingSdkFiles.Count -gt 0) {
+if (-not (Test-RequiredSdkPackageMetadata -SdkManager $sdkManager -SdkRoot $androidHome)) {
     $sdkInstallSucceeded = $false
     for ($attempt = 1; $attempt -le 5; $attempt++) {
         & $sdkManager @sdkPackages
@@ -235,11 +328,23 @@ if ($missingSdkFiles.Count -gt 0) {
         throw "Android SDK package installation failed after 5 attempts."
     }
 }
-else {
-    Write-Host "Required Android SDK packages are already installed."
-}
 
-$escapedSdkPath = $androidHome.Replace("\", "\\").Replace(":", "\:")
+if (-not (Test-RequiredSdkPackageMetadata -SdkManager $sdkManager -SdkRoot $androidHome)) {
+    throw "Required Android SDK packages are missing from sdkmanager metadata."
+}
+$requiredSdkFiles = @(
+    (Join-Path $androidHome "platform-tools\adb.exe"),
+    (Join-Path $androidHome "platforms\android-36\android.jar"),
+    (Join-Path $androidHome "build-tools\36.0.0\apksigner.bat")
+)
+foreach ($requiredSdkFile in $requiredSdkFiles) {
+    if (-not (Test-Path -LiteralPath $requiredSdkFile -PathType Leaf)) {
+        throw "SDK package metadata exists but required package content is missing."
+    }
+}
+Write-Host "Required Android SDK package metadata and content verified."
+
+$escapedSdkPath = ConvertTo-JavaPropertiesEscapedValue -Value $androidHome
 $localProperties = Join-Path $repoRoot "android\local.properties"
 "sdk.dir=$escapedSdkPath" | Set-Content -LiteralPath $localProperties -Encoding ASCII
 

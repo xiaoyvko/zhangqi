@@ -5,12 +5,17 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
+$commonScript = Join-Path $PSScriptRoot "android-build-common.ps1"
+. $commonScript
+
 $setupScript = Join-Path $PSScriptRoot "setup-android.ps1"
 $androidRoot = Join-Path $repoRoot "android"
 $gradleWrapper = Join-Path $androidRoot "gradlew.bat"
 $keystoreProperties = Join-Path $androidRoot "keystore.properties"
+$releaseKeystore = Join-Path $repoRoot ".signing\zhangqi-release.jks"
+$expectedCertificate = Join-Path $androidRoot "release-certificate.sha256"
 $gradleUserHome = Join-Path $repoRoot ".gradle-home"
-$unsignedApk = Join-Path $androidRoot "app\build\outputs\apk\release\app-release.apk"
+$builtApk = Join-Path $androidRoot "app\build\outputs\apk\release\app-release.apk"
 $apksigner = Join-Path $repoRoot ".android-toolchain\sdk\build-tools\36.0.0\apksigner.bat"
 $releaseRoot = Join-Path $repoRoot "release"
 $releaseFileName = ([char]0x8D26).ToString() + [char]0x671F + "-1.0.0.apk"
@@ -31,11 +36,27 @@ function Invoke-CheckedNative {
     }
 }
 
-& $setupScript
-
-if (-not (Test-Path -LiteralPath $keystoreProperties)) {
-    throw "Missing ignored Android signing configuration: android/keystore.properties"
+$localSigningPaths = @(
+    @{
+        Relative = "android/keystore.properties"
+        Absolute = $keystoreProperties
+    },
+    @{
+        Relative = ".signing/zhangqi-release.jks"
+        Absolute = $releaseKeystore
+    }
+)
+foreach ($localSigningPath in $localSigningPaths) {
+    if (-not (Test-Path -LiteralPath $localSigningPath.Absolute -PathType Leaf)) {
+        throw "Required local signing file is missing: $($localSigningPath.Relative)"
+    }
+    Assert-GitPathIgnoredAndUntracked `
+        -RepoRoot $repoRoot `
+        -RelativePath $localSigningPath.Relative
 }
+Write-Host "Signing files are present, ignored, and untracked."
+
+& $setupScript
 
 Push-Location $repoRoot
 try {
@@ -49,45 +70,34 @@ finally {
 $env:GRADLE_USER_HOME = $gradleUserHome
 New-Item -ItemType Directory -Path $gradleUserHome -Force | Out-Null
 
+$gradleExitCode = 1
 Push-Location $androidRoot
 try {
-    $gradleBuildSucceeded = $false
-    for ($attempt = 1; $attempt -le 5; $attempt++) {
-        & $gradleWrapper clean assembleRelease
-        if ($LASTEXITCODE -eq 0) {
-            $gradleBuildSucceeded = $true
-            break
-        }
-
-        if ($attempt -lt 5) {
-            Write-Warning "Gradle release build attempt $attempt failed; retrying."
-            Start-Sleep -Seconds 2
-        }
-    }
-    if (-not $gradleBuildSucceeded) {
-        throw "Gradle release build failed after 5 attempts."
-    }
+    & $gradleWrapper clean assembleRelease
+    $gradleExitCode = $LASTEXITCODE
 }
 finally {
     Pop-Location
 }
+if ($gradleExitCode -ne 0) {
+    Write-Error "Gradle release build failed with exit code $gradleExitCode." -ErrorAction Continue
+    exit $gradleExitCode
+}
 
-if (-not (Test-Path -LiteralPath $unsignedApk)) {
+if (-not (Test-Path -LiteralPath $builtApk -PathType Leaf)) {
     throw "Gradle completed without producing the expected release APK."
 }
-if (-not (Test-Path -LiteralPath $apksigner)) {
+if (-not (Test-Path -LiteralPath $apksigner -PathType Leaf)) {
     throw "apksigner.bat was not found in Android build-tools 36.0.0."
 }
 
-Invoke-CheckedNative -Executable $apksigner -Arguments @(
-    "verify",
-    "--verbose",
-    "--print-certs",
-    $unsignedApk
-)
+Assert-ApkSignerCertificate `
+    -ApkSigner $apksigner `
+    -ApkPath $builtApk `
+    -ExpectedDigestFile $expectedCertificate
 
 New-Item -ItemType Directory -Path $releaseRoot -Force | Out-Null
-Copy-Item -LiteralPath $unsignedApk -Destination $releaseApk -Force
+Copy-Item -LiteralPath $builtApk -Destination $releaseApk -Force
 
 $releaseApkInfo = Get-Item -LiteralPath $releaseApk
 $releaseApkSha256 = (Get-FileHash -LiteralPath $releaseApk -Algorithm SHA256).Hash

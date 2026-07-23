@@ -26,9 +26,9 @@ android {
     signingConfigs {
         if (hasReleaseSigning) {
             release {
-                storeFile file(keystoreProperties['storeFile'])
+                storeFile rootProject.file('../.signing/zhangqi-release.jks')
                 storePassword keystoreProperties['storePassword']
-                keyAlias keystoreProperties['keyAlias']
+                keyAlias 'zhangqi'
                 keyPassword keystoreProperties['keyPassword']
             }
         }
