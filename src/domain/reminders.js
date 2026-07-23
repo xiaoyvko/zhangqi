@@ -6,15 +6,20 @@ export const DEFAULT_REMINDER_SETTINGS = {
 };
 
 export function normalizeReminderSettings(value = {}) {
+  const settings = value && typeof value === "object" && !Array.isArray(value)
+    ? value
+    : {};
+  const time = typeof settings.time === "string" ? settings.time : "";
+
   return {
-    enabled: typeof value.enabled === "boolean" ? value.enabled : true,
-    daysBefore: REMINDER_DAY_OPTIONS.includes(Number(value.daysBefore))
-      ? Number(value.daysBefore)
+    enabled: typeof settings.enabled === "boolean" ? settings.enabled : true,
+    daysBefore: REMINDER_DAY_OPTIONS.includes(Number(settings.daysBefore))
+      ? Number(settings.daysBefore)
       : 3,
-    time: /^\d{2}:\d{2}$/.test(value.time || "") &&
-      Number(value.time.slice(0, 2)) < 24 &&
-      Number(value.time.slice(3, 5)) < 60
-      ? value.time
+    time: /^\d{2}:\d{2}$/.test(time) &&
+      Number(time.slice(0, 2)) < 24 &&
+      Number(time.slice(3, 5)) < 60
+      ? time
       : "09:00",
   };
 }

@@ -87,6 +87,28 @@ describe("finance storage", () => {
     });
   });
 
+  it.each([
+    ["null", null],
+    ["a non-string time", { time: 900 }],
+  ])("keeps version-2 data when reminder settings contain %s", (_, reminderSettings) => {
+    const storage = memoryStorage({
+      [STORAGE_KEY]: JSON.stringify({
+        version: 2,
+        profile: { name: "小雨" },
+        transactions: [{ id: "t1", amount: 28 }],
+        bills: [{ id: "b1", name: "房租" }],
+        reminderSettings,
+      }),
+    });
+
+    expect(loadFinanceData(storage)).toEqual({
+      profile: { ...DEFAULT_PROFILE, name: "小雨" },
+      transactions: [{ id: "t1", amount: 28 }],
+      bills: [{ id: "b1", name: "房租", reminderEnabled: true }],
+      reminderSettings: DEFAULT_REMINDER_SETTINGS,
+    });
+  });
+
   it("adds a new fixed bill and updates an existing one by id", () => {
     const original = [{ id: "b1", name: "房租" }];
     const added = upsertBill(original, { id: "b2", name: "宽带" });
