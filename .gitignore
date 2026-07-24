@@ -13,3 +13,6 @@ mobile-home.png
 release/*.apk
 android/local.properties
 android/keystore.properties
+.openai/
+docs/superpowers/
+output/
