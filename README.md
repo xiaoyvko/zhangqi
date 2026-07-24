@@ -52,9 +52,9 @@
 |---|---|
 | ![首页](screenshots/01-home.jpg) | ![个人](screenshots/04-profile.jpg) |
 
-| 收支明细 |
-|---|
-| ![统计](screenshots/03-stats.jpg) |
+| 固定账期 | 收支明细 |
+|---|---|
+| ![固定账期](screenshots/05-bills.jpg) | ![收支明细](screenshots/03-stats.jpg) |
 
 ---
 
