@@ -101,10 +101,7 @@ pnpm test
 
 ## 📦 安装
 
-1. 下载 `release/账期-*.apk`
-2. 在手机上打开 APK 文件
-3. 允许安装未知来源应用
-4. 打开后在"我的"页面授权通知权限和闹钟权限
+前往 [Releases 页面](https://github.com/xiaoyvko/zhangqi/releases) 下载最新 APK，然后在手机上打开安装即可。
 
 > ⚠️ 更新时不要卸载旧版，直接安装新版覆盖即可保留数据。
 
