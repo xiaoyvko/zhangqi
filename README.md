@@ -48,7 +48,13 @@
 
 ## 📱 截图
 
-> 待补充：首页、账单页、日历视图、统计图、提醒设置
+| 首页 | 日历视图 |
+|---|---|
+| ![首页](screenshots/01-home.jpg) | ![日历](screenshots/02-ledger-calendar.jpg) |
+
+| 分类统计 | 个人中心 |
+|---|---|
+| ![统计](screenshots/03-stats.jpg) | ![个人](screenshots/04-profile.jpg) |
 
 ---
 
